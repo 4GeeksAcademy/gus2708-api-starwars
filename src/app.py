@@ -8,7 +8,7 @@ from flask_swagger import swagger
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
-from models import db, User
+from models import db, User, People, Planet, Favorite
 #from models import Person
 
 app = Flask(__name__)
@@ -18,7 +18,7 @@ db_url = os.getenv("DATABASE_URL")
 if db_url is not None:
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url.replace("postgres://", "postgresql://")
 else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:////tmp/test.db"
+    app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///test.db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 MIGRATE = Migrate(app, db)
@@ -44,6 +44,103 @@ def handle_hello():
     }
 
     return jsonify(response_body), 200
+
+# ======================
+# Endpoints de People
+# ======================
+
+@app.route('/people', methods=['GET'])
+def get_all_people():
+    people = People.query.all()
+    return jsonify([p.serialize() for p in people]), 200
+
+@app.route('/people/<int:people_id>', methods=['GET'])
+def get_people(people_id):
+    people = People.query.get(people_id)
+    if people is None:
+        raise APIException('People not found', status_code=404)
+    return jsonify(people.serialize()), 200
+
+# ======================
+# Endpoints de Planets
+# ======================
+
+@app.route('/planets', methods=['GET'])
+def get_all_planets():
+    planets = Planet.query.all()
+    return jsonify([p.serialize() for p in planets]), 200
+
+@app.route('/planets/<int:planet_id>', methods=['GET'])
+def get_planet(planet_id):
+    planet = Planet.query.get(planet_id)
+    if planet is None:
+        raise APIException('Planet not found', status_code=404)
+    return jsonify(planet.serialize()), 200
+
+# ======================
+# Endpoints de Users
+# ======================
+
+@app.route('/users', methods=['GET'])
+def get_all_users():
+    users = User.query.all()
+    return jsonify([u.serialize() for u in users]), 200
+
+# ======================
+# Endpoints de Favorites
+# ======================
+
+@app.route('/users/favorites', methods=['GET'])
+def get_user_favorites():
+    # Por ahora user_id = 1 (hardcoded)
+    favorites = Favorite.query.filter_by(user_id=1).all()
+    return jsonify([f.serialize() for f in favorites]), 200
+
+@app.route('/favorite/planet/<int:planet_id>', methods=['POST'])
+def add_favorite_planet(planet_id):
+    # Verificar que el planeta existe
+    planet = Planet.query.get(planet_id)
+    if planet is None:
+        raise APIException('Planet not found', status_code=404)
+    
+    # Crear favorito (user_id hardcoded = 1)
+    favorite = Favorite(user_id=1, planet_id=planet_id, people_id=None)
+    db.session.add(favorite)
+    db.session.commit()
+    return jsonify(favorite.serialize()), 200
+
+@app.route('/favorite/people/<int:people_id>', methods=['POST'])
+def add_favorite_people(people_id):
+    # Verificar que el personaje existe
+    people = People.query.get(people_id)
+    if people is None:
+        raise APIException('People not found', status_code=404)
+    
+    # Crear favorito (user_id hardcoded = 1)
+    favorite = Favorite(user_id=1, people_id=people_id, planet_id=None)
+    db.session.add(favorite)
+    db.session.commit()
+    return jsonify(favorite.serialize()), 200
+
+@app.route('/favorite/planet/<int:planet_id>', methods=['DELETE'])
+def delete_favorite_planet(planet_id):
+    favorite = Favorite.query.filter_by(user_id=1, planet_id=planet_id).first()
+    if favorite is None:
+        raise APIException('Favorite not found', status_code=404)
+    
+    db.session.delete(favorite)
+    db.session.commit()
+    return jsonify({"msg": "Favorite deleted"}), 200
+
+@app.route('/favorite/people/<int:people_id>', methods=['DELETE'])
+def delete_favorite_people(people_id):
+    favorite = Favorite.query.filter_by(user_id=1, people_id=people_id).first()
+    if favorite is None:
+        raise APIException('Favorite not found', status_code=404)
+    
+    db.session.delete(favorite)
+    db.session.commit()
+    return jsonify({"msg": "Favorite deleted"}), 200
 
 # this only runs if `$ python src/app.py` is executed
 if __name__ == '__main__':
